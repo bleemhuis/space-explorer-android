@@ -1,0 +1,35 @@
+build:
+  maxIssues: 0
+
+complexity:
+  active: true
+  ComplexMethod:
+    threshold: 15
+  LongMethod:
+    threshold: 60
+  LongParameterList:
+    functionThreshold: 6
+  TooManyFunctions:
+    thresholdInClasses: 15
+
+coroutines:
+  active: true
+  GlobalCoroutineUsage:
+    active: true
+  RedundantSuspendModifier:
+    active: true
+
+naming:
+  active: true
+  FunctionNaming:
+    active: true
+    ignoreAnnotated: ['Composable']
+
+style:
+  active: true
+  MagicNumber:
+    active: false
+  ReturnCount:
+    max: 3
+  UnusedImports:
+    active: true
