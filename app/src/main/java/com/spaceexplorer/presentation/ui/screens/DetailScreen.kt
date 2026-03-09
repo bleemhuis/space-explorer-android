@@ -24,10 +24,13 @@ import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
+import androidx.compose.foundation.clickable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.style.TextOverflow
@@ -36,6 +39,7 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.spaceexplorer.presentation.ui.components.ApodImage
 import com.spaceexplorer.presentation.ui.components.ErrorContent
+import com.spaceexplorer.presentation.ui.components.FullScreenImageViewer
 import com.spaceexplorer.presentation.ui.theme.SpaceExplorerTheme
 import com.spaceexplorer.presentation.viewmodel.ApodUiState
 import com.spaceexplorer.presentation.viewmodel.ApodViewModel
@@ -113,6 +117,16 @@ fun DetailScreen(
 
                 is ApodUiState.Success -> {
                     val apod = state.apod
+                    var showViewer by remember(apod.date) { mutableStateOf(false) }
+
+                    if (showViewer) {
+                        FullScreenImageViewer(
+                            url = apod.displayUrl,
+                            contentDescription = apod.title,
+                            onDismiss = { showViewer = false }
+                        )
+                    }
+
                     Column(
                         modifier = Modifier
                             .fillMaxSize()
@@ -124,6 +138,7 @@ fun DetailScreen(
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .height(320.dp)
+                                .clickable { showViewer = true }
                         )
                         Column(
                             modifier = Modifier.padding(16.dp),

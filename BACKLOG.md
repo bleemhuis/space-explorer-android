@@ -25,4 +25,5 @@
 ## Done
 
 - ~~**Date Picker / APOD History Browser**~~ — Browse past APODs by picking a date range. Implemented in commit `ad8de82`.
-- ~~**Offline Mode / Caching**~~ — Network-first cache with Room fallback (50-entry LRU, thumbnailUrl persisted, DB migration 1→2). Implemented in commit `ad8de82`.
+- ~~**Offline Mode / Caching**~~ — Network-first cache with Room fallback (50-entry LRU, thumbnailUrl persisted, DB migration 1→2). Implemented in commit `a6ffd37`.
+- ~~**Full-Screen Image Viewer**~~ — Tap any APOD image to open a full-screen Dialog with pinch-to-zoom (1×–5×) and pan. No new dependencies.
