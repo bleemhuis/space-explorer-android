@@ -2,8 +2,11 @@ package com.spaceexplorer.data.repository
 
 import com.spaceexplorer.data.remote.api.NasaApiService
 import com.spaceexplorer.data.remote.dto.ApodDto
+import com.spaceexplorer.data.repository.ApodRepositoryImpl.Companion.CACHE_MAX_SIZE
+import com.spaceexplorer.fake.FakeApodCacheDao
 import com.spaceexplorer.fake.FakeApodDao
 import com.spaceexplorer.fake.testApod
+import com.spaceexplorer.fake.testCacheEntity
 import com.spaceexplorer.fake.testEntity
 import io.mockk.coEvery
 import io.mockk.coVerify
@@ -12,6 +15,7 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Before
@@ -21,12 +25,14 @@ class ApodRepositoryImplTest {
 
     private val apiService: NasaApiService = mockk()
     private lateinit var dao: FakeApodDao
+    private lateinit var cacheDao: FakeApodCacheDao
     private lateinit var repository: ApodRepositoryImpl
 
     @Before
     fun setUp() {
         dao = FakeApodDao()
-        repository = ApodRepositoryImpl(apiService, dao)
+        cacheDao = FakeApodCacheDao()
+        repository = ApodRepositoryImpl(apiService, dao, cacheDao)
     }
 
     // --- getApod ---
@@ -251,6 +257,76 @@ class ApodRepositoryImplTest {
         val remaining = repository.getFavorites().first()
         assertEquals(1, remaining.size)
         assertEquals("2024-01-16", remaining.first().date)
+    }
+
+    // --- getApod caching ---
+
+    @Test
+    fun `getApod on network success inserts result into cache`() = runTest {
+        coEvery { apiService.getApod(any(), any()) } returns testDto(date = "2024-06-01")
+
+        repository.getApod("2024-06-01")
+
+        assertEquals(1, cacheDao.insertCallCount)
+        assertNotNull(cacheDao.getByDate("2024-06-01"))
+    }
+
+    @Test
+    fun `getApod on network success caches thumbnailUrl`() = runTest {
+        coEvery { apiService.getApod(any(), any()) } returns testDto(
+            date = "2024-06-01",
+            mediaType = "video",
+            thumbnailUrl = "https://example.com/thumb.jpg"
+        )
+
+        repository.getApod("2024-06-01")
+
+        val cached = cacheDao.getByDate("2024-06-01")
+        assertEquals("https://example.com/thumb.jpg", cached?.thumbnailUrl)
+    }
+
+    @Test
+    fun `getApod on network failure returns cached entry when available`() = runTest {
+        cacheDao.seed(testCacheEntity(date = "2024-06-01", title = "Cached Nebula"))
+        coEvery { apiService.getApod(any(), any()) } throws RuntimeException("Offline")
+
+        val result = repository.getApod("2024-06-01")
+
+        assertTrue(result.isSuccess)
+        assertEquals("Cached Nebula", result.getOrThrow().title)
+    }
+
+    @Test
+    fun `getApod on network failure returns network error when cache empty`() = runTest {
+        coEvery { apiService.getApod(any(), any()) } throws RuntimeException("Offline")
+
+        val result = repository.getApod("2024-06-01")
+
+        assertTrue(result.isFailure)
+        assertEquals("Offline", result.exceptionOrNull()?.message)
+    }
+
+    @Test
+    fun `getApod evicts oldest entries when cache exceeds max size`() = runTest {
+        val oldEntries = (1..CACHE_MAX_SIZE).map { i ->
+            testCacheEntity(date = "2023-01-%02d".format(i), cachedAt = i.toLong())
+        }
+        cacheDao.seed(*oldEntries.toTypedArray())
+        coEvery { apiService.getApod(any(), any()) } returns testDto(date = "2024-06-01")
+
+        repository.getApod("2024-06-01")
+
+        assertEquals(CACHE_MAX_SIZE, cacheDao.count())
+        assertEquals(1, cacheDao.deleteOldestCallCount)
+    }
+
+    @Test
+    fun `getApod does not evict when cache is below max size`() = runTest {
+        coEvery { apiService.getApod(any(), any()) } returns testDto(date = "2024-06-01")
+
+        repository.getApod("2024-06-01")
+
+        assertEquals(0, cacheDao.deleteOldestCallCount)
     }
 }
 
