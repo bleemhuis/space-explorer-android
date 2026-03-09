@@ -9,11 +9,13 @@ import androidx.navigation.compose.composable
 import androidx.navigation.navArgument
 import com.spaceexplorer.presentation.ui.screens.DetailScreen
 import com.spaceexplorer.presentation.ui.screens.FavoritesScreen
+import com.spaceexplorer.presentation.ui.screens.HistoryScreen
 import com.spaceexplorer.presentation.ui.screens.HomeScreen
 
 internal object Routes {
     const val HOME = "home"
     const val FAVORITES = "favorites"
+    const val HISTORY = "history"
     const val DETAIL = "detail/{date}"
 
     fun detail(date: String): String = "detail/${Uri.encode(date)}"
@@ -32,7 +34,19 @@ fun AppNavGraph(navController: NavHostController) {
                 },
                 onNavigateToFavorites = {
                     navController.navigate(Routes.FAVORITES)
+                },
+                onNavigateToHistory = {
+                    navController.navigate(Routes.HISTORY)
                 }
+            )
+        }
+
+        composable(Routes.HISTORY) {
+            HistoryScreen(
+                onNavigateToDetail = { date ->
+                    navController.navigate(Routes.detail(date))
+                },
+                onNavigateUp = { navController.navigateUp() }
             )
         }
 

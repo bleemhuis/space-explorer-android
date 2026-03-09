@@ -10,9 +10,12 @@ class FakeApodRepository : ApodRepository {
     val storedFavorites = mutableListOf<Apod>()
 
     var apodResult: Result<Apod> = Result.success(testApod())
+    var apodRangeResult: Result<List<Apod>> = Result.success(emptyList())
 
     var getApodCalled = false
     var lastGetApodDate: String? = null
+    var lastRangeStart: String? = null
+    var lastRangeEnd: String? = null
 
     var addFavoriteCallCount = 0
     var removeFavoriteCallCount = 0
@@ -22,6 +25,12 @@ class FakeApodRepository : ApodRepository {
         getApodCalled = true
         lastGetApodDate = date
         return apodResult
+    }
+
+    override suspend fun getApodRange(startDate: String, endDate: String): Result<List<Apod>> {
+        lastRangeStart = startDate
+        lastRangeEnd = endDate
+        return apodRangeResult
     }
 
     override fun getFavorites(): Flow<List<Apod>> = flowOf(storedFavorites.toList())

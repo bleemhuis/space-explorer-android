@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.DateRange
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.FavoriteBorder
 import androidx.compose.material3.Button
@@ -46,6 +47,7 @@ import com.spaceexplorer.presentation.viewmodel.UiEvent
 fun HomeScreen(
     onNavigateToDetail: (date: String) -> Unit,
     onNavigateToFavorites: () -> Unit,
+    onNavigateToHistory: () -> Unit,
     viewModel: ApodViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()
@@ -65,6 +67,12 @@ fun HomeScreen(
             TopAppBar(
                 title = { Text("Space Explorer") },
                 actions = {
+                    IconButton(onClick = onNavigateToHistory) {
+                        Icon(
+                            imageVector = Icons.Default.DateRange,
+                            contentDescription = "APOD-Verlauf"
+                        )
+                    }
                     IconButton(onClick = onNavigateToFavorites) {
                         Icon(
                             imageVector = Icons.Default.Favorite,

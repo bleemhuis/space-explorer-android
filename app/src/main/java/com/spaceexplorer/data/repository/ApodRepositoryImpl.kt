@@ -22,6 +22,15 @@ class ApodRepositoryImpl @Inject constructor(
             runCatching { apiService.getApod(date).toDomain() }
         }
 
+    override suspend fun getApodRange(startDate: String, endDate: String): Result<List<Apod>> =
+        withContext(Dispatchers.IO) {
+            runCatching {
+                apiService.getApodRange(startDate, endDate)
+                    .map { it.toDomain() }
+                    .sortedByDescending { it.date }
+            }
+        }
+
     override fun getFavorites(): Flow<List<Apod>> =
         dao.getAllFavorites().map { entities -> entities.map { it.toDomain() } }
 
