@@ -1,6 +1,6 @@
 package com.spaceexplorer.di
 
-import com.jakewharton.retrofit2.converter.kotlinx.serialization.asConverterFactory
+import retrofit2.converter.kotlinx.serialization.asConverterFactory
 import com.spaceexplorer.BuildConfig
 import com.spaceexplorer.data.remote.api.NasaApiService
 import dagger.Module
