@@ -8,6 +8,7 @@ import com.spaceexplorer.data.mapper.toEntity
 import com.spaceexplorer.data.remote.api.NasaApiService
 import com.spaceexplorer.domain.model.Apod
 import com.spaceexplorer.domain.repository.ApodRepository
+import com.spaceexplorer.domain.repository.FavoriteRepository
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
@@ -20,7 +21,7 @@ class ApodRepositoryImpl @Inject constructor(
     private val apiService: NasaApiService,
     private val dao: ApodDao,
     private val cacheDao: ApodCacheDao
-) : ApodRepository {
+) : ApodRepository, FavoriteRepository {
 
     override suspend fun getApod(date: String?): Result<Apod> =
         withContext(Dispatchers.IO) {
