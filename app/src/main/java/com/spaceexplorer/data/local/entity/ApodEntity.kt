@@ -12,5 +12,6 @@ data class ApodEntity(
     val hdUrl: String?,
     val mediaType: String,
     val copyright: String?,
+    val thumbnailUrl: String?,
     val savedAt: Long = System.currentTimeMillis()
 )

@@ -6,6 +6,7 @@ import com.spaceexplorer.data.local.dao.ApodCacheDao
 import com.spaceexplorer.data.local.dao.ApodDao
 import com.spaceexplorer.data.local.database.AppDatabase
 import com.spaceexplorer.data.local.database.migrations.MIGRATION_1_2
+import com.spaceexplorer.data.local.database.migrations.MIGRATION_2_3
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
@@ -25,7 +26,7 @@ object DatabaseModule {
             AppDatabase::class.java,
             "space_explorer.db"
         )
-            .addMigrations(MIGRATION_1_2)
+            .addMigrations(MIGRATION_1_2, MIGRATION_2_3)
             .build()
 
     @Provides

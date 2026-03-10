@@ -24,7 +24,7 @@ internal fun ApodEntity.toDomain(): Apod = Apod(
     hdUrl = hdUrl,
     mediaType = mediaType,
     copyright = copyright,
-    thumbnailUrl = null  // not persisted in Room schema
+    thumbnailUrl = thumbnailUrl
 )
 
 internal fun Apod.toEntity(): ApodEntity = ApodEntity(
@@ -34,7 +34,8 @@ internal fun Apod.toEntity(): ApodEntity = ApodEntity(
     url = url,
     hdUrl = hdUrl,
     mediaType = mediaType,
-    copyright = copyright
+    copyright = copyright,
+    thumbnailUrl = thumbnailUrl
 )
 
 internal fun ApodCacheEntity.toDomain(): Apod = Apod(
