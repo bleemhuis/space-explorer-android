@@ -1,308 +1,297 @@
-# Architecture Review — Space Explorer Android
+# Architektur-Review: Space Explorer Android
 
-**Reviewed:** 2026-03-09
-**Reviewer Role:** Senior Android Architect (android-architect-reviewer)
-**Files analysed:** 28 Kotlin-Dateien über alle Schichten
-
----
-
-## 1. Clean Architecture — Note: 6 / 10
-
-### Positiv
-Die Paketstruktur bildet die drei Schichten korrekt ab. DTOs erreichen nie die Presentation-Schicht. Mapper sind in `data/mapper/` isoliert und korrekt als `internal` deklariert. Repository-Interface in `domain/`, Implementierung in `data/` — korrekte Inversion.
-
-### Verletzungen
-
-**Verletzung 1 — `javax.inject.Inject` in der Domain-Schicht**
-
-`GetApodUseCase.kt` Z. 5+7, `ToggleFavoriteUseCase.kt` Z. 6+8:
-```kotlin
-import javax.inject.Inject
-
-class GetApodUseCase @Inject constructor(
-```
-`javax.inject` koppelt die Domain an einen DI-Container. Die CLAUDE.md-Regel „domain hat **keine** Android-Abhängigkeiten" ist im strengen Sinne verletzt. In der Praxis weitgehend akzeptiert, aber dokumentierungswürdig.
-
-**Verletzung 2 — `ApodViewModel` greift direkt auf `ApodRepository` zu**
-
-`ApodViewModel.kt` Z. 6, 26, 35:
-```kotlin
-import com.spaceexplorer.domain.repository.ApodRepository  // Z. 6
-
-class ApodViewModel @Inject constructor(
-    private val getApodUseCase: GetApodUseCase,
-    private val toggleFavoriteUseCase: ToggleFavoriteUseCase,
-    private val repository: ApodRepository          // Z. 26 — direkter Repository-Zugriff
-) : ViewModel() {
-    ...
-    repository.isFavorite(state.apod.date)          // Z. 35
-```
-`isFavorite()` wird direkt vom ViewModel aufgerufen, nicht via Use Case. Ein `ObserveIsFavoriteUseCase` fehlt.
-
-**Verletzung 3 — `FavoritesViewModel` hat null Use Cases**
-
-`FavoritesViewModel.kt` Z. 6, 16, 19, 28:
-```kotlin
-import com.spaceexplorer.domain.repository.ApodRepository
-
-class FavoritesViewModel @Inject constructor(
-    private val repository: ApodRepository    // Z. 16
-) : ViewModel() {
-    val favorites = repository.getFavorites() // Z. 19
-    fun removeFavorite(apod: Apod) {
-        repository.removeFavorite(apod.date)  // Z. 28
-    }
-}
-```
-Beide Business-Operationen (`getFavorites`, `removeFavorite`) werden direkt auf dem Repository aufgerufen. Fehlende Use Cases: `GetFavoritesUseCase`, `RemoveFavoriteUseCase`.
-
-**Verletzung 4 — `thumbnailUrl` wird beim DB-Round-Trip verloren**
-
-`ApodMapper.kt` Z. 26:
-```kotlin
-internal fun ApodEntity.toDomain(): Apod = Apod(
-    ...
-    thumbnailUrl = null  // not persisted in Room schema
-)
-```
-`ApodEntity` hat kein `thumbnailUrl`-Feld. Bei Video-APODs wird `displayUrl` aus der DB immer auf den rohen YouTube-URL fallen, der in einem `Image`-Composable nicht darstellbar ist. Die Business-Regel `isVideo` / `displayUrl` bricht lautlos nach einem DB-Round-Trip.
-
-**Verletzung 5 — `exportSchema = false`**
-
-`AppDatabase.kt` Z. 11:
-```kotlin
-@Database(entities = [ApodEntity::class], version = 1, exportSchema = false)
-```
-Die CLAUDE.md-Spec sieht automatisch generierte Schema-Export-Dateien vor. Mit `exportSchema = false` wird kein Schema exportiert — Migration-Safety-Net ist deaktiviert.
-
-| Regel | Status |
-|---|---|
-| Abhängigkeitsrichtung | Teilweise verletzt (2 ViewModels halten Repositories) |
-| Domain ohne Android-Imports | Grenzwertig (`javax.inject`) |
-| Use Cases als einziger Einstiegspunkt aus Presentation | Verletzt |
-| DTOs bleiben in der Data-Schicht | Korrekt |
-| Entity-Mapping vollständig | Verletzt (`thumbnailUrl` geht verloren) |
-| Schema-Export | Verletzt |
+> Analysiert: 42 Kotlin-Dateien (Produktion + Tests)
+> Datum: 2026-03-09
+> Gesamtnote: **7/10**
 
 ---
 
-## 2. SOLID-Prinzipien — Note: 5 / 10
+## 1. Clean Architecture — Note: 8/10
 
-### Single Responsibility
-
-**SRP-Verletzung 1 — `ApodViewModel` hat drei Aufgaben**
-
-`ApodViewModel.kt`:
-1. Tagesaktuelle APOD laden (Z. 53–63 — Netzwerk)
-2. Favoriten-Toggle-Zustand verwalten (Z. 65–73 — DB-Schreiben)
-3. Favoriten-Status reaktiv beobachten (Z. 32–44 — DB-Lesen-Stream)
-
-Aufgabe 3 ruft `repository.isFavorite()` direkt auf, was Use Cases umgeht und das Testen erschwert.
-
-**SRP-Verletzung 2 — `ApodUiState.kt` enthält zwei Sealed Classes**
-
-`ApodUiState.kt`:
-```kotlin
-sealed class ApodUiState { ... }  // Z. 5–9
-sealed class UiEvent { ... }      // Z. 11–13
-```
-Zwei konzeptionell verschiedene Typen in einer Datei. `UiEvent` ist ein Einweg-Seiteneffekt-Kanal; `ApodUiState` ist beobachtbarer Zustand — gehören in getrennte Dateien.
-
-**SRP-Verletzung 3 — Vollqualifizierter Type-Name in Composable-Body**
-
-`HomeScreen.kt` Z. 111:
-```kotlin
-androidx.compose.foundation.layout.Row(
-    modifier = Modifier.fillMaxWidth(),
-```
-`Row` wurde nicht in den Import-Block aufgenommen und stattdessen vollqualifiziert verwendet — Java-Style-Workaround.
-
-### Dependency Inversion
-
-**DIP-Verletzung — ViewModels hängen an `ApodRepository` statt an Use Cases**
-
-Bereits oben detailliert. Auch wenn `ApodRepository` ein Interface ist, kennt die Presentation-Schicht Repository-Level-Operationen — verletzt DIP im Sinne geschichteter Architektur.
-
-**DIP korrekt — `RepositoryModule` nutzt `@Binds`**
-
-`RepositoryModule.kt`:
-```kotlin
-@Binds
-@Singleton
-abstract fun bindApodRepository(impl: ApodRepositoryImpl): ApodRepository
-```
-Idiomatisch korrekt.
-
-### Interface Segregation
-
-`ApodRepository` hat 5 Methoden. `FavoritesViewModel` nutzt nur 2 davon. Test-Doubles müssen alle 5 Methoden stubben — ISP-Geruch. Mögliche Aufteilung: `ApodRemoteRepository` + `FavoritesRepository`.
-
-### Open/Closed
-
-`NasaApiService.getApodRange()` (Z. 15–21) ist deklariert, aber nirgends aufgerufen — totes Interface ohne Produktionsnutzen.
-
----
-
-## 3. Kotlin-Qualität — Note: 7 / 10
-
-### Positiv
-
-**`runCatching` idiomatisch**
-
-`ApodRepositoryImpl.kt` Z. 22:
-```kotlin
-runCatching { apiService.getApod(date).toDomain() }
-```
-
-**`data object` für singleton sealed class member**
-
-`ApodUiState.kt` Z. 6:
-```kotlin
-data object Loading : ApodUiState()
-```
-Korrektes Kotlin 1.9+ Idiom.
-
-**`apply` korrekt in `NetworkModule`**
-
-`NetworkModule.kt` Z. 41–48:
-```kotlin
-HttpLoggingInterceptor().apply {
-    level = if (BuildConfig.DEBUG) { ... } else { ... }
-}
-```
-
-**`EXISTS`-Subquery im DAO**
-
-`ApodDao.kt` Z. 20–21:
-```kotlin
-@Query("SELECT EXISTS(SELECT 1 FROM favorites WHERE date = :date)")
-fun isFavorite(date: String): Flow<Boolean>
-```
+### Stärken
+- Die Dependency Rule wird durchgehend eingehalten. Keine `import com.spaceexplorer.data.*`-Zeile in `domain/` oder `presentation/`.
+- Die Domain-Schicht hat keinerlei Android-Imports (`android.*`). Nur `javax.inject.Inject` (JSR-330) wird verwendet — als Framework-unabhängige DI-Annotation akzeptabel.
+- Repository-Interface in `domain/repository/ApodRepository.kt`, Implementierung in `data/repository/ApodRepositoryImpl.kt` — korrekte Inversion.
+- Mapper (`data/mapper/ApodMapper.kt`) wandeln DTOs und Entities sauber in Domain-Modelle um. DTOs werden nie an die Presentation-Schicht weitergegeben.
 
 ### Schwächen
 
-**Problem 1 — Vollqualifizierter `Row`-Import**
+**S1: Use Cases sind teilweise reine Durchreich-Delegationen ohne Business-Logik**
 
-`HomeScreen.kt` Z. 111:
+Die folgenden Use Cases sind 1:1-Weiterleitungen an das Repository ohne Transformation oder Validierung:
+
+- `domain/usecase/GetApodUseCase.kt`, Zeile 10–11
+- `domain/usecase/GetApodRangeUseCase.kt`, Zeile 10–11
+- `domain/usecase/GetFavoritesUseCase.kt`, Zeile 11
+- `domain/usecase/ObserveIsFavoriteUseCase.kt`, Zeile 10
+
+`GetApodRangeUseCase` könnte z.B. die Datumsvalidierung kapseln (kein Datum in der Zukunft, Startdatum vor Enddatum) — tut es aber nicht.
+
+Positiv: `ToggleFavoriteUseCase` und `RemoveFavoriteUseCase` enthalten tatsächlich eigene Logik.
+
+**S2: `ApodUiState` verwendet `Apod` (Domain-Modell) direkt**
+
+`presentation/viewmodel/ApodUiState.kt`, Zeile 3 und 7:
+```kotlin
+import com.spaceexplorer.domain.model.Apod
+data class Success(val apod: Apod) : ApodUiState()
+```
+
+Architektonisch erlaubt (Presentation darf Domain kennen), aber in strikter Clean Architecture würden dedizierte UI-Models verwendet. Bei diesem Projektumfang vertretbar.
+
+**S3: Kein separates Domain-Modul**
+
+Alles liegt in einem einzigen `app`-Modul. Der Compiler erzwingt die Schichtentrennung nicht — sie basiert rein auf Konvention. Bei Wachstum werden versehentliche Schichtverletzungen wahrscheinlicher.
+
+---
+
+## 2. SOLID-Prinzipien — Note: 7/10
+
+### Stärken
+- Use Cases haben je eine `invoke()`-Methode (Single Responsibility).
+- ViewModels sind klar getrennt (`ApodViewModel`, `FavoritesViewModel`, `HistoryViewModel`).
+- Repository wird über Interface (`ApodRepository`) injiziert — Dependency Inversion korrekt.
+- Sealed Classes (`ApodUiState`, `HistoryUiState`, `UiEvent`) ermöglichen typsichere Erweiterung (Open/Closed).
+
+### Verletzungen
+
+**V1: `ApodRepository`-Interface ist zu breit — Interface Segregation Principle verletzt**
+
+`domain/repository/ApodRepository.kt`, Zeile 6–13:
+```kotlin
+interface ApodRepository {
+    suspend fun getApod(date: String? = null): Result<Apod>
+    suspend fun getApodRange(startDate: String, endDate: String): Result<List<Apod>>
+    fun getFavorites(): Flow<List<Apod>>
+    fun isFavorite(date: String): Flow<Boolean>
+    suspend fun addFavorite(apod: Apod)
+    suspend fun removeFavorite(date: String)
+}
+```
+
+Dieses Interface mischt zwei völlig verschiedene Verantwortlichkeiten: APOD-Abruf (API) und Favoriten-Verwaltung (lokal). Ein Client, der nur Favoriten braucht (`FavoritesViewModel`), muss das gesamte Interface kennen. Besser wären `ApodFetchRepository` und `FavoriteRepository`.
+
+**V2: `ApodRepositoryImpl` hat zu viele Verantwortlichkeiten — Single Responsibility verletzt**
+
+`data/repository/ApodRepositoryImpl.kt` verwaltet gleichzeitig:
+1. API-Aufrufe (Zeile 27)
+2. Cache-Logik mit Eviction (Zeile 30–34)
+3. Offline-Fallback (Zeile 36–43)
+4. Favoriten-CRUD (Zeile 56–66)
+
+Die Cache-Eviction-Logik gehört in eine eigene Klasse oder zumindest in den `CacheDao`.
+
+**V3: `FavoritesViewModel` verwendet `List<Apod>` statt eines dedizierten UiState**
+
+`presentation/viewmodel/FavoritesViewModel.kt`, Zeile 23:
+```kotlin
+val favorites: StateFlow<List<Apod>>
+```
+
+Es fehlt ein dedizierter `FavoritesUiState` (sealed class mit Loading/Success/Error). Der initiale Zustand `emptyList()` ist nicht von "Daten werden geladen" unterscheidbar. Fehlerbehandlung fehlt komplett.
+
+**V4: Kein Timeout im `NetworkModule`**
+
+`di/NetworkModule.kt`, Zeile 32–49: Der OkHttpClient hat keine expliziten Timeouts. Die OkHttp-Defaults (10s) können bei der NASA-API zu knapp sein.
+
+---
+
+## 3. Kotlin-Qualität — Note: 7/10
+
+### Stärken
+- Korrekte Nutzung von `data class`, `sealed class`, `data object`.
+- `operator fun invoke()` für Use Cases — idiomatisch.
+- Extension Functions im Mapper — sauber.
+- `mutableFloatStateOf` statt `mutableStateOf<Float>` in `ZoomableImage.kt` (Zeile 31) — Performance-bewusst.
+- `?.let { }` für Nullable-Handling korrekt (`HomeScreen.kt`, Zeile 160).
+- `coerceIn` in `ZoomableImage.kt` Zeile 35 — idiomatisch.
+
+### Schwächen
+
+**K1: Voll qualifizierter Klassenname statt Import**
+
+`presentation/ui/screens/HomeScreen.kt`, Zeile 134:
 ```kotlin
 androidx.compose.foundation.layout.Row(
 ```
-Import fehlt. Trivial zu beheben.
 
-**Problem 2 — Race Condition in `ToggleFavoriteUseCase`**
+Statt eines regulären Imports wird der FQN inline verwendet. Deutet auf Copy-Paste oder vergessenes Auto-Import hin.
 
-`ToggleFavoriteUseCase.kt` Z. 12–16:
+**K2: Hardcodierte Strings überall in der UI**
+
+Alle UI-Texte sind direkt in Composables hartcodiert statt `stringResource(R.string.*)` zu verwenden. Internationalisierung ist so unmöglich.
+
+Betroffene Dateien (Auswahl):
+- `HomeScreen.kt` (Zeile 72, 78, 84, 177)
+- `DetailScreen.kt` (Zeile 82, 93)
+- `FavoritesScreen.kt` (Zeile 69, 90, 159)
+- `HistoryScreen.kt` (Zeile 70, 83, 99, 114)
+- `ErrorContent.kt` (Zeile 35)
+- `FullScreenImageViewer.kt` (Zeile 52)
+- `ApodDateRangePicker.kt` (Zeile 44, 48)
+
+**K3: Fehlende `Modifier`-Parameter in Top-Level-Composables**
+
+`FullScreenImageViewer` (Zeile 21) und `ApodDateRangePicker` (Zeile 21) akzeptieren keinen `modifier`-Parameter. Das verletzt die Compose-API-Richtlinien für öffentliche Composables.
+
+**K4: Duplizierter Code zwischen `HomeScreen` und `DetailScreen`**
+
+Die Bild-Anzeige mit FullScreenViewer, Favoriten-Toggle und APOD-Detail-Anzeige ist in beiden Screens nahezu identisch (`HomeScreen.kt` Zeile 105–181, `DetailScreen.kt` Zeile 118–165). Könnte in ein gemeinsames `ApodContent`-Composable extrahiert werden.
+
+**K5: `thumbnailUrl = null` im Mapper — funktionaler Bug**
+
+`data/mapper/ApodMapper.kt`, Zeile 27:
 ```kotlin
-if (repository.isFavorite(apod.date).first()) {
-    repository.removeFavorite(apod.date)
-} else {
-    repository.addFavorite(apod)
-}
+thumbnailUrl = null  // not persisted in Room schema
 ```
-`.first()` auf einem `Flow<Boolean>` terminiert nach einer Emission. Zwischen Read und Write kann der DB-Zustand ändern (Race Condition). Idiomatischere Alternative: atomare DB-Operation (`UPSERT` / `DELETE WHERE EXISTS`) oder `suspend fun isFavorite()` das einen einzelnen Wert zurückgibt.
 
-**Problem 3 — Hardcodierte deutsche UI-Strings**
-
-`ApodViewModel.kt` Z. 59–60:
-```kotlin
-ApodUiState.Error(error.message ?: "Unbekannter Fehler")
-UiEvent.ShowSnackbar(error.message ?: "Fehler beim Laden")
-```
-Alle User-Facing Strings gehören in `res/values/strings.xml`. Verhindert Lokalisierung und Lint-Checks.
-
-**Problem 4 — `provideApodDao` ohne `@Singleton`**
-
-`DatabaseModule.kt` Z. 27:
-```kotlin
-@Provides
-fun provideApodDao(database: AppDatabase): ApodDao = database.apodDao()
-```
-Kein Scope-Annotation. Hilt erzeugt bei jeder Injektion eine neue `ApodDao`-Instanz — irreführend, auch wenn Room intern dieselbe Instanz zurückgibt.
+Die `ApodEntity` speichert keine `thumbnailUrl`. Ein Video, das als Favorit gespeichert wird, verliert seinen Thumbnail beim Laden aus der Datenbank. Das ist ein funktionaler Datenverlust-Bug.
 
 ---
 
-## 4. Fehlerbehandlung — Note: 5 / 10
+## 4. Fehlerbehandlung — Note: 6/10
 
-### Positiv
+### Stärken
+- `Result<T>` wird konsequent als Return-Typ für API-Aufrufe verwendet.
+- `runCatching` in `ApodRepositoryImpl.getApod()` (Zeile 27) und `getApodRange()` (Zeile 49).
+- `onSuccess`/`onFailure` in allen ViewModels — sauberes Pattern.
+- Fallback auf Cache bei Netzwerkfehler (`ApodRepositoryImpl.kt`, Zeile 36–43).
+- `UiEvent.ShowSnackbar` für transiente Fehlermeldungen.
 
-`runCatching` in `ApodRepositoryImpl` fängt alle `Throwable` korrekt ab. `ApodViewModel` reportet Fehler sowohl als persistenter `Error`-State als auch als Snackbar-Event.
+### Schwächen
 
-### Kritische Schwächen
+**F1: `getApodRange` hat keinen Offline-Cache-Fallback**
 
-**Kritisch 1 — NASA API JSON-Fehlerbodies werden nie geparst**
-
-`NasaApiService.kt` Z. 9–13:
+`data/repository/ApodRepositoryImpl.kt`, Zeile 47–54:
 ```kotlin
-suspend fun getApod(...): ApodDto  // nicht Response<ApodDto>
-```
-Retrofit wirft bei Non-2xx Responses eine `HttpException`. Der JSON-Fehlerbody der NASA API:
-```json
-{"error":{"code":"API_KEY_MISSING","message":"No api_key was supplied..."}}
-```
-wird **nie geparst**. Der User sieht `"HTTP 403 "` statt einer sinnvollen Fehlermeldung. Lösung: `Response<ApodDto>` + dedizierter Error-Parser.
-
-**Kritisch 2 — `FavoritesViewModel.removeFavorite()` hat null Error Handling**
-
-`FavoritesViewModel.kt` Z. 26–29:
-```kotlin
-fun removeFavorite(apod: Apod) {
-    viewModelScope.launch {
-        repository.removeFavorite(apod.date)  // kein try/catch, kein runCatching
+override suspend fun getApodRange(startDate: String, endDate: String): Result<List<Apod>> =
+    withContext(Dispatchers.IO) {
+        runCatching {
+            apiService.getApodRange(startDate, endDate)
+                .map { it.toDomain() }
+                .sortedByDescending { it.date }
+        }
     }
+```
+
+Im Gegensatz zu `getApod()` wird hier bei Netzwerkfehler kein Cache-Fallback versucht. Die History-Funktion ist offline nicht nutzbar.
+
+**F2: `FavoritesViewModel` hat keine Fehlerbehandlung — Crash-Risiko**
+
+`presentation/viewmodel/FavoritesViewModel.kt`, Zeile 23–28:
+```kotlin
+val favorites: StateFlow<List<Apod>> = getFavoritesUseCase()
+    .stateIn(...)
+```
+
+Wenn der Room-Flow eine Exception wirft (z.B. bei korrupter Datenbank), gibt es keinen `.catch`-Operator. Die App würde crashen. Fix: `.catch { emit(emptyList()) }` hinzufügen.
+
+**F3: Keine Datumsvalidierung bei API-Aufrufen**
+
+NASA APOD existiert seit dem 16.06.1995. Weder `GetApodUseCase` noch `GetApodRangeUseCase` validieren ob:
+- das Datum in der Zukunft liegt
+- das Startdatum vor dem Enddatum liegt
+- der Zeitraum die API-Limits überschreitet
+
+Bei ungültigen Daten zeigt die App nur "Unbekannter Fehler" — keine hilfreiche Nutzermeldung.
+
+**F4: `addFavorite` und `removeFavorite` geben kein `Result<Unit>` zurück**
+
+`data/repository/ApodRepositoryImpl.kt`, Zeile 62–66:
+```kotlin
+override suspend fun addFavorite(apod: Apod) =
+    withContext(Dispatchers.IO) { dao.insertFavorite(apod.toEntity()) }
+
+override suspend fun removeFavorite(date: String) =
+    withContext(Dispatchers.IO) { dao.deleteFavoriteByDate(date) }
+```
+
+Bei Room-Fehler würde eine unbehandelte Exception propagiert. `ToggleFavoriteUseCase.addFavorite` hat kein `runCatching`-Wrapping.
+
+**F5: Bild-Fehlerfall zeigt nur eine leere Box ohne Feedback**
+
+`presentation/ui/components/ApodImage.kt`, Zeile 40–46:
+```kotlin
+error = {
+    Box(
+        modifier = Modifier
+            .matchParentSize()
+            .background(MaterialTheme.colorScheme.errorContainer)
+    )
 }
 ```
-Eine Room-Exception (Disk voll, DB-Korruption) lässt die Coroutine lautlos crashen. Kein Feedback an den User, kein State-Update — UI und DB können inkonsistent werden.
 
-**Kritisch 3 — Exception in `toggleFavorite` wird vollständig verworfen**
+Kein Fehlertext, kein Icon, kein Retry-Button. Der Nutzer sieht nur eine farbige Fläche.
 
-`ApodViewModel.kt` Z. 68–71:
+**F6: `DetailScreen` lädt APOD doppelt**
+
+`presentation/ui/screens/DetailScreen.kt`, Zeile 59–61:
 ```kotlin
-runCatching { toggleFavoriteUseCase(state.apod) }
-    .onFailure {
-        _uiEvent.emit(UiEvent.ShowSnackbar("Favorit konnte nicht gespeichert werden"))
-    }
+LaunchedEffect(date) {
+    viewModel.loadApod(date)
+}
 ```
-`it` (der Throwable) wird ignoriert. Kein Logging, keine Unterscheidung zwischen Fehlertypen.
 
-**Kritisch 4 — `ToggleFavoriteUseCase` gibt `Unit` statt `Result<Unit>` zurück**
-
-`ToggleFavoriteUseCase.kt` Z. 11:
-```kotlin
-suspend operator fun invoke(apod: Apod)  // Unit — kein Error Contract
-```
-Inkonsistent zu `GetApodUseCase`, das `Result<Apod>` zurückgibt. Der Aufrufer muss `runCatching` selbst hinzufügen — der Fehlervertrag ist nicht im Typsystem ausgedrückt.
-
-**Kritisch 5 — Kein Timeout auf `OkHttpClient`**
-
-`NetworkModule.kt` Z. 33–49:
-```kotlin
-OkHttpClient.Builder()
-    .addInterceptor { ... }
-    .addInterceptor(HttpLoggingInterceptor()...)
-    .build()
-    // kein connectTimeout(), readTimeout(), writeTimeout(), kein Retry
-```
-OkHttp-Defaults (10 s) sind nicht deklariert. Kein Retry bei NASA-API 503-Antworten.
+Da `ApodViewModel` im `init`-Block bereits `loadApod()` aufruft (Zeile 50–51), wird beim Navigieren zweimal geladen: einmal ohne Datum (= heute) und einmal mit dem übergebenen Datum. Führt zu kurzem Flackern und einer unnötigen API-Anfrage.
 
 ---
 
-## Gesamtbewertung
+## 5. Zusätzliche Befunde
+
+**Z1: Fehlende Tests für `ApodViewModel` und `FavoritesViewModel`**
+
+Vorhandene Tests:
+- `GetApodUseCaseTest` ✓
+- `ToggleFavoriteUseCaseTest` ✓
+- `GetApodRangeUseCaseTest` ✓
+- `ApodRepositoryImplTest` ✓
+- `HistoryViewModelTest` ✓
+
+Nicht getestet:
+- `ApodViewModel` (komplexester ViewModel)
+- `FavoritesViewModel`
+- `ObserveIsFavoriteUseCase`
+- `GetFavoritesUseCase`
+- `RemoveFavoriteUseCase`
+
+ViewModel-Testabdeckung: **33% (1 von 3)**
+
+**Z2: Keine Instrumented Tests vorhanden**
+
+`app/src/androidTest/` ist komplett leer. Die CLAUDE.md fordert "UI-Tests mit Compose Testing API für kritische Flows" — nicht umgesetzt.
+
+**Z3: `exportSchema = false` widerspricht CLAUDE.md**
+
+`data/local/database/AppDatabase.kt`, Zeile 13:
+```kotlin
+exportSchema = false
+```
+
+Die CLAUDE.md erwähnt "Schema-Export-Dateien (`schemas/`) sind schreibgeschützt" — das setzt voraus, dass Schema-Export aktiviert ist. Sollte auf `true` geändert und der Export-Pfad in `build.gradle.kts` konfiguriert werden.
+
+---
+
+## Zusammenfassung
 
 | Kategorie | Note | Kritischste Schwäche | Quick Fix möglich? |
 |---|---|---|---|
-| Clean Architecture | **6 / 10** | Beide ViewModels injizieren `ApodRepository` direkt — Use Case Layer wird umgangen | Ja — `GetFavoritesUseCase` + `RemoveFavoriteUseCase` anlegen, Repository aus ViewModels entfernen |
-| SOLID-Prinzipien | **5 / 10** | `ApodRepository`-Interface hat 5 Methoden, ISP verletzt; `FavoritesViewModel` ohne SRP-Abgrenzung | Teilweise — Interface-Split erfordert Refactoring in mehreren Dateien |
-| Kotlin-Qualität | **7 / 10** | `flow.first()` Race Condition in `ToggleFavoriteUseCase`; vollqualifizierter `Row`-Import | Ja — `Row`-Import trivial; Race Condition erfordert atomare DB-Operation |
-| Fehlerbehandlung | **5 / 10** | NASA API JSON-Fehlerbodies werden nie geparst; `FavoritesViewModel.removeFavorite()` hat null Error Handling | Nein — erfordert `Response<T>`-Wrapper und dedizierte Error-Parsing-Logik |
+| Clean Architecture | **8/10** | Use Cases ohne Business-Logik (reine Delegation) | Nein — erfordert Architektur-Entscheidung |
+| SOLID-Prinzipien | **7/10** | `ApodRepository` mischt API- und Favoriten-Verantwortung (ISP) | Ja — Interface aufteilen |
+| Kotlin-Qualität | **7/10** | Hardcodierte UI-Strings statt String-Ressourcen | Ja — systematische Extraktion |
+| Fehlerbehandlung | **6/10** | `FavoritesViewModel` crasht bei Room-Exception (kein `.catch`) | Ja — `.catch { }` hinzufügen |
 
----
+**Gesamtnote: 7/10**
 
-## Priorisierte Maßnahmen (vor Phase 2)
+Die Codebasis ist für ein Projekt dieser Größe gut strukturiert. Schichtentrennung und grundlegende Patterns (MVVM, sealed UiState, Result-Wrapping) sind korrekt implementiert. Die größten Risiken liegen in der unvollständigen Fehlerbehandlung (F2, F6), dem funktionalen Thumbnail-Bug bei Favoriten (K5), und der lückenhaften Testabdeckung (Z1, Z2).
 
-1. **`GetFavoritesUseCase` + `RemoveFavoriteUseCase` anlegen** — `ApodRepository` aus beiden ViewModels entfernen
-2. **`ToggleFavoriteUseCase` → `Result<Unit>`** — konsistenter Error-Contract
-3. **`FavoritesViewModel.removeFavorite()` absichern** — `runCatching` + Snackbar-Event
-4. **`thumbnailUrl` in `ApodEntity` ergänzen** — Room-Migration Version 1→2 anlegen
-5. **`NasaApiService` auf `Response<ApodDto>`** — NASA-Fehlerbody parsen
-6. **Strings in `strings.xml`** auslagern
-7. **`exportSchema = true`** + Schema-Pfad konfigurieren
+### Empfohlene Prioritäten
+
+| Priorität | Maßnahme | Betrifft |
+|---|---|---|
+| 1 — Sofort (Crash-Risiko) | `.catch { }` in `FavoritesViewModel` | F2 |
+| 2 — Kurzfristig (Bug) | `thumbnailUrl` in `ApodEntity` persistieren | K5 |
+| 3 — Kurzfristig (UX) | Doppeltes Laden in `DetailScreen` beheben | F6 |
+| 4 — Mittelfristig | String-Ressourcen extrahieren | K2 |
+| 5 — Mittelfristig | Datumsvalidierung in Use Cases | F3 |
+| 6 — Langfristig | `ApodRepository`-Interface aufteilen | V1 |
+| 7 — Langfristig | ViewModel-Tests schreiben (ApodViewModel, FavoritesViewModel) | Z1 |
