@@ -27,9 +27,11 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
+import com.spaceexplorer.R
 import com.spaceexplorer.presentation.ui.components.ApodDateRangePicker
 import com.spaceexplorer.presentation.ui.components.ErrorContent
 import com.spaceexplorer.presentation.ui.components.HistoryItem
@@ -67,12 +69,12 @@ fun HistoryScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("APOD-Verlauf") },
+                title = { Text(stringResource(R.string.title_history)) },
                 navigationIcon = {
                     IconButton(onClick = onNavigateUp) {
                         Icon(
                             imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                            contentDescription = "Zurück"
+                            contentDescription = stringResource(R.string.cd_navigate_back)
                         )
                     }
                 },
@@ -80,7 +82,7 @@ fun HistoryScreen(
                     IconButton(onClick = { viewModel.openDatePicker() }) {
                         Icon(
                             imageVector = Icons.Default.DateRange,
-                            contentDescription = "Zeitraum wählen"
+                            contentDescription = stringResource(R.string.cd_pick_date_range)
                         )
                     }
                 }
@@ -96,7 +98,7 @@ fun HistoryScreen(
         ) {
             when (val state = uiState) {
                 is HistoryUiState.Idle -> Text(
-                    text = "Wähle einen Zeitraum über das Kalendersymbol.",
+                    text = stringResource(R.string.history_idle_hint),
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
@@ -111,7 +113,7 @@ fun HistoryScreen(
                 is HistoryUiState.Success -> {
                     if (state.items.isEmpty()) {
                         Text(
-                            text = "Keine Bilder für diesen Zeitraum gefunden.",
+                            text = stringResource(R.string.history_empty),
                             style = MaterialTheme.typography.bodyMedium,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )

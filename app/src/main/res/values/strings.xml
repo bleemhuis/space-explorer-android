@@ -1,3 +1,35 @@
 <resources>
     <string name="app_name">Space Explorer</string>
+
+    <!-- Navigation / Content Descriptions -->
+    <string name="cd_navigate_back">Zurück</string>
+    <string name="cd_history">APOD-Verlauf</string>
+    <string name="cd_favorites">Favoriten</string>
+    <string name="cd_add_to_favorites">Zu Favoriten hinzufügen</string>
+    <string name="cd_remove_from_favorites">Aus Favoriten entfernen</string>
+    <string name="cd_delete_favorite">Favorit entfernen</string>
+    <string name="cd_pick_date_range">Zeitraum wählen</string>
+    <string name="cd_close">Schließen</string>
+
+    <!-- Screen titles -->
+    <string name="title_favorites">Favoriten</string>
+    <string name="title_history">APOD-Verlauf</string>
+
+    <!-- Buttons -->
+    <string name="btn_read_more">Vollständig lesen</string>
+    <string name="btn_retry">Erneut versuchen</string>
+    <string name="btn_confirm">Übernehmen</string>
+    <string name="btn_cancel">Abbrechen</string>
+
+    <!-- Empty states -->
+    <string name="empty_favorites">Noch keine Favoriten gespeichert.</string>
+    <string name="history_idle_hint">Wähle einen Zeitraum über das Kalendersymbol.</string>
+    <string name="history_empty">Keine Bilder für diesen Zeitraum gefunden.</string>
+
+    <!-- Error messages -->
+    <string name="error_unknown">Unbekannter Fehler</string>
+    <string name="error_loading">Fehler beim Laden</string>
+    <string name="error_favorite_save">Favorit konnte nicht gespeichert werden</string>
+    <string name="error_favorites_load">Favoriten konnten nicht geladen werden</string>
+    <string name="error_favorite_remove">Favorit konnte nicht entfernt werden</string>
 </resources>

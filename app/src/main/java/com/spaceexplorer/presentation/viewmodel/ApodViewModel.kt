@@ -1,11 +1,14 @@
 package com.spaceexplorer.presentation.viewmodel
 
+import android.content.Context
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.spaceexplorer.R
 import com.spaceexplorer.domain.usecase.GetApodUseCase
 import com.spaceexplorer.domain.usecase.ObserveIsFavoriteUseCase
 import com.spaceexplorer.domain.usecase.ToggleFavoriteUseCase
 import dagger.hilt.android.lifecycle.HiltViewModel
+import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -23,7 +26,8 @@ import javax.inject.Inject
 class ApodViewModel @Inject constructor(
     private val getApodUseCase: GetApodUseCase,
     private val toggleFavoriteUseCase: ToggleFavoriteUseCase,
-    private val observeIsFavoriteUseCase: ObserveIsFavoriteUseCase
+    private val observeIsFavoriteUseCase: ObserveIsFavoriteUseCase,
+    @ApplicationContext private val context: Context
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow<ApodUiState>(ApodUiState.Loading)
@@ -46,18 +50,16 @@ class ApodViewModel @Inject constructor(
     private val _uiEvent = MutableSharedFlow<UiEvent>()
     val uiEvent = _uiEvent.asSharedFlow()
 
-    init {
-        loadApod()
-    }
-
     fun loadApod(date: String? = null) {
         viewModelScope.launch {
             _uiState.update { ApodUiState.Loading }
             getApodUseCase(date)
                 .onSuccess { apod -> _uiState.update { ApodUiState.Success(apod) } }
                 .onFailure { error ->
-                    _uiState.update { ApodUiState.Error(error.message ?: "Unbekannter Fehler") }
-                    _uiEvent.emit(UiEvent.ShowSnackbar(error.message ?: "Fehler beim Laden"))
+                    _uiState.update {
+                        ApodUiState.Error(error.message ?: context.getString(R.string.error_unknown))
+                    }
+                    _uiEvent.emit(UiEvent.ShowSnackbar(error.message ?: context.getString(R.string.error_loading)))
                 }
         }
     }
@@ -67,7 +69,7 @@ class ApodViewModel @Inject constructor(
         viewModelScope.launch {
             toggleFavoriteUseCase(state.apod)
                 .onFailure {
-                    _uiEvent.emit(UiEvent.ShowSnackbar("Favorit konnte nicht gespeichert werden"))
+                    _uiEvent.emit(UiEvent.ShowSnackbar(context.getString(R.string.error_favorite_save)))
                 }
         }
     }

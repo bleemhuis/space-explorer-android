@@ -35,10 +35,12 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
+import com.spaceexplorer.R
 import com.spaceexplorer.domain.model.Apod
 import com.spaceexplorer.presentation.ui.components.ApodImage
 import com.spaceexplorer.presentation.ui.theme.SpaceExplorerTheme
@@ -66,12 +68,12 @@ fun FavoritesScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Favoriten") },
+                title = { Text(stringResource(R.string.title_favorites)) },
                 navigationIcon = {
                     IconButton(onClick = onNavigateUp) {
                         Icon(
                             imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                            contentDescription = "Zurück"
+                            contentDescription = stringResource(R.string.cd_navigate_back)
                         )
                     }
                 }
@@ -87,7 +89,7 @@ fun FavoritesScreen(
                 contentAlignment = Alignment.Center
             ) {
                 Text(
-                    text = "Noch keine Favoriten gespeichert.",
+                    text = stringResource(R.string.empty_favorites),
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
@@ -156,7 +158,7 @@ private fun FavoriteItem(
             IconButton(onClick = onDelete) {
                 Icon(
                     imageVector = Icons.Default.Delete,
-                    contentDescription = "Favorit entfernen",
+                    contentDescription = stringResource(R.string.cd_delete_favorite),
                     tint = MaterialTheme.colorScheme.error
                 )
             }

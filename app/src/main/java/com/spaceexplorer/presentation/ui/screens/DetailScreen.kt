@@ -33,10 +33,12 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
+import com.spaceexplorer.R
 import com.spaceexplorer.presentation.ui.components.ApodImage
 import com.spaceexplorer.presentation.ui.components.ErrorContent
 import com.spaceexplorer.presentation.ui.components.FullScreenImageViewer
@@ -79,7 +81,7 @@ fun DetailScreen(
                     IconButton(onClick = onNavigateUp) {
                         Icon(
                             imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                            contentDescription = "Zurück"
+                            contentDescription = stringResource(R.string.cd_navigate_back)
                         )
                     }
                 },
@@ -89,8 +91,8 @@ fun DetailScreen(
                             Icon(
                                 imageVector = if (isFavorite) Icons.Default.Favorite
                                 else Icons.Default.FavoriteBorder,
-                                contentDescription = if (isFavorite) "Aus Favoriten entfernen"
-                                else "Zu Favoriten hinzufügen",
+                                contentDescription = if (isFavorite) stringResource(R.string.cd_remove_from_favorites)
+                                else stringResource(R.string.cd_add_to_favorites),
                                 tint = if (isFavorite) MaterialTheme.colorScheme.primary
                                 else MaterialTheme.colorScheme.onSurface
                             )

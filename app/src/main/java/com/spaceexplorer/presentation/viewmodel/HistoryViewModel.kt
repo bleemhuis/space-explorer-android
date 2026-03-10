@@ -1,9 +1,12 @@
 package com.spaceexplorer.presentation.viewmodel
 
+import android.content.Context
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.spaceexplorer.R
 import com.spaceexplorer.domain.usecase.GetApodRangeUseCase
 import dagger.hilt.android.lifecycle.HiltViewModel
+import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -15,7 +18,8 @@ import javax.inject.Inject
 
 @HiltViewModel
 class HistoryViewModel @Inject constructor(
-    private val getApodRangeUseCase: GetApodRangeUseCase
+    private val getApodRangeUseCase: GetApodRangeUseCase,
+    @ApplicationContext private val context: Context
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow<HistoryUiState>(HistoryUiState.Idle)
@@ -44,8 +48,10 @@ class HistoryViewModel @Inject constructor(
                     _uiState.update { HistoryUiState.Success(items) }
                 }
                 .onFailure { error ->
-                    _uiState.update { HistoryUiState.Error(error.message ?: "Unbekannter Fehler") }
-                    _uiEvent.emit(UiEvent.ShowSnackbar(error.message ?: "Fehler beim Laden"))
+                    _uiState.update {
+                        HistoryUiState.Error(error.message ?: context.getString(R.string.error_unknown))
+                    }
+                    _uiEvent.emit(UiEvent.ShowSnackbar(error.message ?: context.getString(R.string.error_loading)))
                 }
         }
     }

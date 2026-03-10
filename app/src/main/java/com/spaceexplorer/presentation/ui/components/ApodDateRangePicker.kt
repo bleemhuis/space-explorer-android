@@ -7,7 +7,9 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.rememberDateRangePickerState
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.tooling.preview.Preview
+import com.spaceexplorer.R
 import com.spaceexplorer.presentation.ui.theme.SpaceExplorerTheme
 import java.time.Instant
 import java.time.LocalDate
@@ -41,11 +43,11 @@ fun ApodDateRangePicker(
                 enabled = state.selectedStartDateMillis != null &&
                         state.selectedEndDateMillis != null
             ) {
-                Text("Übernehmen")
+                Text(stringResource(R.string.btn_confirm))
             }
         },
         dismissButton = {
-            TextButton(onClick = onDismiss) { Text("Abbrechen") }
+            TextButton(onClick = onDismiss) { Text(stringResource(R.string.btn_cancel)) }
         }
     ) {
         DateRangePicker(state = state)
