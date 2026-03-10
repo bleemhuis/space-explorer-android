@@ -1,6 +1,6 @@
 package com.spaceexplorer.domain.usecase
 
-import com.spaceexplorer.fake.FakeApodRepository
+import com.spaceexplorer.fake.FakeFavoriteRepository
 import com.spaceexplorer.fake.testApod
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
@@ -11,12 +11,12 @@ import org.junit.Test
 
 class ToggleFavoriteUseCaseTest {
 
-    private lateinit var repository: FakeApodRepository
+    private lateinit var repository: FakeFavoriteRepository
     private lateinit var useCase: ToggleFavoriteUseCase
 
     @Before
     fun setUp() {
-        repository = FakeApodRepository()
+        repository = FakeFavoriteRepository()
         useCase = ToggleFavoriteUseCase(repository)
     }
 

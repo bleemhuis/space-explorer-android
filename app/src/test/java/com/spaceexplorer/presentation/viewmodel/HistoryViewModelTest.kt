@@ -1,8 +1,12 @@
 package com.spaceexplorer.presentation.viewmodel
 
+import android.content.Context
+import com.spaceexplorer.R
 import com.spaceexplorer.domain.usecase.GetApodRangeUseCase
 import com.spaceexplorer.fake.FakeApodRepository
 import com.spaceexplorer.fake.testApod
+import io.mockk.every
+import io.mockk.mockk
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.first
@@ -26,13 +30,18 @@ class HistoryViewModelTest {
     private lateinit var repository: FakeApodRepository
     private lateinit var useCase: GetApodRangeUseCase
     private lateinit var viewModel: HistoryViewModel
+    private lateinit var context: Context
 
     @Before
     fun setUp() {
         Dispatchers.setMain(testDispatcher)
+        context = mockk<Context>(relaxed = true).also {
+            every { it.getString(R.string.error_unknown) } returns "Unbekannter Fehler"
+            every { it.getString(R.string.error_loading) } returns "Fehler beim Laden"
+        }
         repository = FakeApodRepository()
         useCase = GetApodRangeUseCase(repository)
-        viewModel = HistoryViewModel(useCase)
+        viewModel = HistoryViewModel(useCase, context)
     }
 
     @After
